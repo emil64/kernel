@@ -130,7 +130,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   procTab[ 0 ].pid      = 1;
   procTab[ 0 ].age      = 0;
   procTab[ 0 ].priority = 80;
-  procTab[ 0 ].niceness = -20;
+  procTab[ 0 ].niceness = 0;
   procTab[ 0 ].cpu_time = 0.0f;
   procTab[ 0 ].status   = STATUS_READY;
   procTab[ 0 ].tos      = ( uint32_t )( &tos_P1  );
@@ -142,7 +142,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   procTab[ 1 ].pid      = 2;
   procTab[ 1 ].age      = 0;
   procTab[ 1 ].priority = 80;
-  procTab[ 1 ].niceness = 0;
+  procTab[ 1 ].niceness = -10;
   procTab[ 1 ].cpu_time = 0.0f;
   procTab[ 1 ].status   = STATUS_READY;
   procTab[ 1 ].tos      = ( uint32_t )( &tos_P2  );

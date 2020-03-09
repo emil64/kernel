@@ -1,7 +1,7 @@
 # Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
 #
-# Use of this source code is restricted per the CC BY-NC-ND license, a copy of 
-# which can be found via http://creativecommons.org (and should be included as 
+# Use of this source code is restricted per the CC BY-NC-ND license, a copy of
+# which can be found via http://creativecommons.org (and should be included as
 # LICENSE.txt within the associated archive or repository).
 
 # part 1: variables
@@ -17,7 +17,7 @@
  QEMU_UART        = stdio
 #QEMU_UART       += telnet:127.0.0.1:1235,server
 #QEMU_UART       += telnet:127.0.0.1:1236,server
- QEMU_DISPLAY     = -nographic -display none 
+ QEMU_DISPLAY     = -nographic -display none
 #QEMU_DISPLAY     =            -display  sdl
 
  LINARO_PATH      = /opt/software/gcc-linaro-5.1-2015.08-x86_64_arm-eabi
@@ -42,7 +42,7 @@
 build       : ${PROJECT_TARGETS}
 
 launch-qemu : ${PROJECT_TARGETS}
-	@${QEMU_PATH}/bin/qemu-system-arm -nodefaults -M realview-pb-a8 -m 512M ${QEMU_DISPLAY} -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -S -kernel $(filter %.bin, ${PROJECT_TARGETS})
+	@QEMU_AUDIO_DRV=none ${QEMU_PATH}/bin/qemu-system-arm -nodefaults -M realview-pb-a8 -m 512M ${QEMU_DISPLAY} -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -S -kernel $(filter %.bin, ${PROJECT_TARGETS})
 
 launch-gdb  : ${PROJECT_TARGETS}
 	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gdb -ex "file $(filter %.elf, ${PROJECT_TARGETS})" -ex "target remote ${QEMU_GDB}"
@@ -55,3 +55,6 @@ kill-gdb    :
 
 clean       :
 	@rm -f core ${PROJECT_OBJECTS} ${PROJECT_TARGETS}
+
+include Makefile.console
+include Makefile.disk
