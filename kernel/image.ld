@@ -22,13 +22,11 @@ SECTIONS {
   /* allocate stack for svc mode     */
   .            = . + 0x00002000;
   tos_svc      = .;
-  /* allocate stack for P1           */
-  .       = . + 0x00001000;
-  tos_P1  = .;
-  /* allocate stack for P2           */
-  .       = . + 0x00001000;
-  tos_P2  = .;
-  /* allocate stack for P3           */
-  .       = . + 0x00001000;
-  tos_P3  = .;
+  /* allocate stack for console      */
+    .            = . + 0x00002000;
+  tos_console = .;
+
+  /* allocate stack for max 32 processes           */
+  .            = . + 32 * 0x00002000;
+  tos_general  = .;
 }
