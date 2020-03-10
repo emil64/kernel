@@ -1,10 +1,3 @@
-/* Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
- *
- * Use of this source code is restricted per the CC BY-NC-ND license, a copy of
- * which can be found via http://creativecommons.org (and should be included as
- * LICENSE.txt within the associated archive or repository).
- */
-
 #include "hilevel.h"
 
 
@@ -42,7 +35,11 @@ void schedule( ctx_t* ctx ) {
   int next = 0;
   for( int i = 0; i < n_pcb; i++ ) {
     int pr = procTab[ i ].priority + procTab[ i ].niceness + procTab[ i ].age;
-    if ( pr <= min_priority && (procTab[ i ].status == STATUS_READY || procTab[ i ].status == STATUS_EXECUTING)){
+    if ( pr <= min_priority &&
+      (procTab[ i ].status == STATUS_READY || procTab[ i ].status == STATUS_EXECUTING)){
+
+      if(i != 0 && procTab[ i ].status==STATUS_TERMINATED)
+        PL011_putc( UART0, '>',      true );
       next = i;
       min_priority = pr;
     }
@@ -251,16 +248,17 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       PL011_putc( UART0, ' ', true );
       PL011_putc( UART0, '0' + pid,      true );
       PL011_putc( UART0, '\n',      true );
-      pcb_t *process = NULL;
+      //pcb_t *process = NULL;
 
-      for(int i=0; i< n_pcb; i++){
-        if( pid == procTab[ i ].pid && procTab[ i ].status != STATUS_TERMINATED )
+      int i;
+      for(i=0; i< n_pcb; i++){
+        if( pid == procTab[ i ].pid && procTab[ i ].status != STATUS_TERMINATED ){
           procTab[ i ].status = STATUS_TERMINATED;
-          PL011_putc( UART0, 'K',      true );
           break;
+        }
       }
       ctx->gpr[ 0 ] = 0; //success
-
+      //procTab[ 1 ].status = STATUS_TERMINATED;
       break;
     }
 
