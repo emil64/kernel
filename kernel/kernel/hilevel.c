@@ -264,6 +264,14 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x007 : { //SYS_NICE (pid, x)
 
+      int pid = ctx->gpr[ 0 ];
+      int nice = ctx->gpr[ 1 ];
+      for(i=0; i< n_pcb; i++){
+        if( pid == procTab[ i ].pid && procTab[ i ].status != STATUS_TERMINATED ){
+          procTab[ i ].niceness = nice;
+          break;
+        }
+      }
       break;
     }
 
