@@ -70,4 +70,13 @@ typedef struct {
      ctx_t    ctx; // execution context
 } pcb_t;
 
+typedef struct {
+
+} pipe_t
+
+typedef struct {
+  pipe_t pipe;
+  int free;
+} fd_t
+
 #endif

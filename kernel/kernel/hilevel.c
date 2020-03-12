@@ -24,7 +24,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
     PL011_putc( UART0, next_pid, true );
     PL011_putc( UART0, ']',      true );
 
-    executing = next;                           // update   executing process to P_{next}
+    executing = next;      // update   executing process to P_{next}
 
   return;
 }
@@ -38,8 +38,7 @@ void schedule( ctx_t* ctx ) {
     if ( pr <= min_priority &&
       (procTab[ i ].status == STATUS_READY || procTab[ i ].status == STATUS_EXECUTING)){
 
-      if(i != 0 && procTab[ i ].status==STATUS_TERMINATED)
-        PL011_putc( UART0, '>',      true );
+      //PL011_putc( UART0, '0'+i,      true );
       next = i;
       min_priority = pr;
     }
@@ -168,6 +167,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x02 : { //SYS_READ
 
+
       break;
     }
 
@@ -262,16 +262,26 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       break;
     }
 
-    case 0x007 : { //SYS_NICE (pid, x)
+    case 0x07 : { //SYS_NICE (pid, x)
 
       int pid = ctx->gpr[ 0 ];
       int nice = ctx->gpr[ 1 ];
-      for(i=0; i< n_pcb; i++){
+      for(int i=0; i< n_pcb; i++){
         if( pid == procTab[ i ].pid && procTab[ i ].status != STATUS_TERMINATED ){
           procTab[ i ].niceness = nice;
           break;
         }
       }
+      break;
+    }
+
+    case 0x08 : { //SYS_PIPE
+
+      break;
+    }
+
+    casse 0x09 : { //SYS_CLOSEPIPE
+
       break;
     }
 
