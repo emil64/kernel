@@ -148,7 +148,6 @@ void nice( int pid, int x ) {
   return;
 }
 
-<<<<<<< HEAD
 int pipe( int fields[2] ) {
   int r;
   asm volatile( "mov r0, %1 \n" // assign r0 = x
@@ -166,25 +165,6 @@ void close_pipe( int id)  {
                 "svc %0     \n" // make system call SYS_CLOSEPIPE
               :
               : "I" (SYS_CLOSEPIPE), "r" (id)
-=======
-void pipe( int *fds) {
-  int r;
-  asm volatile( "mov r0, %1 \n" // assign r0 = x
-                "svc %0     \n" // make system call SYS_PIPE
-                "mov %0, r0 \n" // assign r0 =    r
-              : "=r" (r)
-              : "I" (SYS_PIPE), "r" (fds)
-              : "r0" );
-
-  return;
-}
-
-void close_pipe( int id) {
-  asm volatile( "mov r0, %1 \n" // assign r0 = x
-                "svc %0     \n" // make system call SYS_CLOSEPIPE
-              :
-              : "I" (SYS_PIPE), "r" (id)
->>>>>>> cff17f9346bd223ec53bf6fe61a167cd52e8c82b
               : "r0" );
 
   return;

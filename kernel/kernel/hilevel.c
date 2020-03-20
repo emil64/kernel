@@ -290,7 +290,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x08 : { //SYS_PIPE
 
-<<<<<<< HEAD
       int *fildes = (int *) ctx->gpr[0];
 
       pipe_t *pipe = (pipe_t*) malloc(sizeof(pipe_t));
@@ -337,12 +336,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x09 : { //SYS_CLOSEPIPE
-=======
-      break;
-    }
-
-    casse 0x09 : { //SYS_CLOSEPIPE
->>>>>>> cff17f9346bd223ec53bf6fe61a167cd52e8c82b
 
       break;
     }

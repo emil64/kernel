@@ -80,7 +80,6 @@ typedef struct {
 } pcb_t;
 
 typedef struct {
-<<<<<<< HEAD
   char buffer[ 100 ];
   int  size;
   int  readers;
@@ -91,14 +90,5 @@ typedef struct {
   pipe_t*        pipe;
   fd_status_t    access;
 } fildes_t;
-=======
-
-} pipe_t
-
-typedef struct {
-  pipe_t pipe;
-  int free;
-} fd_t
->>>>>>> cff17f9346bd223ec53bf6fe61a167cd52e8c82b
 
 #endif
