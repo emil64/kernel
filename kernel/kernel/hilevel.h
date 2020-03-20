@@ -16,6 +16,8 @@
 
 #include <string.h>
 
+#include <stdlib.h>
+
 // Include functionality relating to the platform.
 
 #include   "GIC.h"
@@ -52,8 +54,15 @@ typedef enum {
 
   STATUS_READY,
   STATUS_EXECUTING,
-  STATUS_WAITING
+  STATUS_WAITING_READ,
+  STATUS_WAITING_WRITE
 } status_t;
+
+typedef enum {
+  READ,
+  WRITE,
+  FREE
+} fd_status_t;
 
 typedef struct {
   uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
@@ -69,5 +78,17 @@ typedef struct {
   uint32_t    tos; // address of Top of Stack (ToS)
      ctx_t    ctx; // execution context
 } pcb_t;
+
+typedef struct {
+  char buffer[ 100 ];
+  int  size;
+  int  readers;
+  int  writers;
+} pipe_t;
+
+typedef struct {
+  pipe_t*        pipe;
+  fd_status_t    access;
+} fildes_t;
 
 #endif

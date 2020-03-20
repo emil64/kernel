@@ -4,6 +4,7 @@
 pcb_t procTab[ MAX_PROCS ]; pcb_t* executing = NULL;
 int n_pcb, n_pid;
 uint32_t stack_offset = 0x2000;
+fildes_t fdTab[ 128 ];
 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   char prev_pid = '?', next_pid = '?';
@@ -24,7 +25,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
     PL011_putc( UART0, next_pid, true );
     PL011_putc( UART0, ']',      true );
 
-    executing = next;                           // update   executing process to P_{next}
+    executing = next;      // update   executing process to P_{next}
 
   return;
 }
@@ -38,8 +39,7 @@ void schedule( ctx_t* ctx ) {
     if ( pr <= min_priority &&
       (procTab[ i ].status == STATUS_READY || procTab[ i ].status == STATUS_EXECUTING)){
 
-      if(i != 0 && procTab[ i ].status==STATUS_TERMINATED)
-        PL011_putc( UART0, '>',      true );
+      //PL011_putc( UART0, '0'+i,      true );
       next = i;
       min_priority = pr;
     }
@@ -87,15 +87,17 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
     procTab[ i ].status = STATUS_INVALID;
   }
 
-  /* Automatically execute the user programs P1 and P2 by setting the fields
-   * in two associated PCBs.  Note in each case that
-   *
-   * - the CPSR value of 0x50 means the processor is switched into USR mode,
-   *   with IRQ interrupts enabled, and
-   * - the PC and SP values match the entry point and top of stack.
-   */
+  //initialise file descriptor table
 
-  memset( &procTab[ 0 ], 0, sizeof( pcb_t ) ); // initialise 0-th PCB = P_1
+  for( int i = 0; i < 128; i++) {
+    fdTab[ i ].access = FREE;
+  }
+
+  fdTab[ 0 ].access = READ;   //STDIN_FILENO
+  fdTab[ 1 ].access = WRITE;  //STDOUT_FILENO
+  fdTab[ 2 ].access = WRITE;  //STDERR_FILENO
+
+  memset( &procTab[ 0 ], 0, sizeof( pcb_t ) ); // initialise 0-th PCB = console
   procTab[ 0 ].pid      = 1;
   procTab[ 0 ].age      = 0;
   procTab[ 0 ].priority = 80;
@@ -157,16 +159,27 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       char*  x = ( char* )( ctx->gpr[ 1 ] );
       int    n = ( int   )( ctx->gpr[ 2 ] );
 
-      for( int i = 0; i < n; i++ ) {
-        PL011_putc( UART0, *x++, true );
+      if( fd == 1) { //STDOUT_FILENO
+        for( int i = 0; i < n; i++ ) {
+          PL011_putc( UART0, *x++, true );
+        }
+        ctx->gpr[ 0 ] = n;
+
+      }
+      else if( fdTab[ fd ].access == WRITE){
+
+
+      }
+      else{
+        ctx->gpr[0] = -1;  //file descriptor not ment for writing
       }
 
-      ctx->gpr[ 0 ] = n;
 
       break;
     }
 
     case 0x02 : { //SYS_READ
+
 
       break;
     }
@@ -262,7 +275,67 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       break;
     }
 
-    case 0x007 : { //SYS_NICE (pid, x)
+    case 0x07 : { //SYS_NICE (pid, x)
+
+      int pid = ctx->gpr[ 0 ];
+      int nice = ctx->gpr[ 1 ];
+      for(int i=0; i< n_pcb; i++){
+        if( pid == procTab[ i ].pid && procTab[ i ].status != STATUS_TERMINATED ){
+          procTab[ i ].niceness = nice;
+          break;
+        }
+      }
+      break;
+    }
+
+    case 0x08 : { //SYS_PIPE
+
+      int *fildes = (int *) ctx->gpr[0];
+
+      pipe_t *pipe = (pipe_t*) malloc(sizeof(pipe_t));
+
+      if(pipe == NULL){
+        ctx->gpr[0] = -1;
+        break;
+      }
+
+      pipe->readers = 1;
+      pipe->writers = 1;
+
+      int read_fd = -1;
+      int write_fd = -1;
+
+      for( int i=0; i<128; i++){
+        if(fdTab[ i ].access == FREE){
+          if(read_fd == -1){
+            read_fd = i;
+          }
+          else if(write_fd == -1){
+            write_fd = i;
+            break;
+          }
+        }
+      }
+
+      //no fd available
+      if(read_fd == -1 || write_fd == -1){
+        ctx->gpr[ 0 ] = -1;
+        break;
+      }
+      else {
+        fdTab[ read_fd ].access = READ;
+        fdTab[ read_fd ].pipe = pipe;
+
+        fdTab[ write_fd ].access = WRITE;
+        fdTab[ write_fd ].pipe = pipe;
+
+        ctx->gpr[ 0 ] = 0;
+      }
+
+      break;
+    }
+
+    case 0x09 : { //SYS_CLOSEPIPE
 
       break;
     }
@@ -273,4 +346,13 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
   }
 
   return;
+}
+
+//invoked at the beging of the scheduler
+void try_write( int pcb ) {
+
+}
+
+void try_read( int pcb ) {
+
 }
