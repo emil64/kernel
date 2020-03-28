@@ -77,7 +77,7 @@ extern int  kill( pid_t pid, int x );
 extern void nice( pid_t pid, int x );
 
 //for creating a pipe
-extern int pipe( int *fds);
+extern int pipe( const int *fds);
 //for closing a pipe
-extern void close_pipe( int id );
+extern void close( int id );
 #endif

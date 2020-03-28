@@ -1,10 +1,3 @@
-/* Copyright (C) 2017 Daniel Page <csdsp@bristol.ac.uk>
- *
- * Use of this source code is restricted per the CC BY-NC-ND license, a copy of
- * which can be found via http://creativecommons.org (and should be included as
- * LICENSE.txt within the associated archive or repository).
- */
-
 #include "libc.h"
 
 int  atoi( char* x        ) {
@@ -94,11 +87,11 @@ int  read( int fd,       void* x, size_t n ) {
 int  fork() {
   int r;
 
-  asm volatile( "svc %1     \n" // make system call SYS_FORK
-                "mov %0, r0 \n" // assign r  = r0
-              : "=r" (r)
-              : "I" (SYS_FORK)
-              : "r0" );
+    asm volatile( "svc %1     \n" // make system call SYS_FORK
+                  "mov %0, r0 \n" // assign r  = r0
+                : "=r" (r)
+                : "I" (SYS_FORK)
+                : "r0" );
 
   return r;
 }
@@ -148,19 +141,19 @@ void nice( int pid, int x ) {
   return;
 }
 
-int pipe( int fields[2] ) {
+int pipe( const int fds[2] ) {
   int r;
-  asm volatile( "mov r0, %1 \n" // assign r0 = x
+  asm volatile( "mov r0, %2 \n" // assign r0 = x
                 "svc %1     \n" // make system call SYS_PIPE
                 "mov %0, r0 \n" // assign r0 =    r
               : "=r" (r)
-              : "I" (SYS_PIPE), "r" (fields)
+              : "I" (SYS_PIPE), "r" (fds)
               : "r0" );
 
   return r;
 }
 
-void close_pipe( int id)  {
+void close( int id)  {
   asm volatile( "mov r0, %1 \n" // assign r0 = id
                 "svc %0     \n" // make system call SYS_CLOSEPIPE
               :

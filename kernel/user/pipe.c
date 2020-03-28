@@ -7,6 +7,7 @@ void main_pipe() {
     if(status == -1)
         write( STDOUT_FILENO, "Could not create any fds\n", 12 );
 
+
     switch ( fork() ) {
         case -1:
         {/* Handle error */
@@ -29,7 +30,7 @@ void main_pipe() {
             write( STDOUT_FILENO, "Child: received ", 16 );
             write( STDOUT_FILENO, buf, nbytes );
 
-            close_pipe(fds[0] );
+            close(fds[0] );
             write( STDOUT_FILENO, "Child out.\n", 22 );
             exit( EXIT_SUCCESS );
         }
@@ -39,8 +40,8 @@ void main_pipe() {
             const char msg1[] = "\"Hello world from another world\"\n";
             const char msg2[] = "\"Another Message\"\n";
 
-            write( STDOUT_FILENO, "Parent: sending \"Hello world\"\n", 30 );
-            write(fds[1], msg1, 14);
+            write( STDOUT_FILENO, "Parent: sending \"Hello world\"\n", 32 );
+            write(fds[1], msg1, 20);
 
             for ( int c = 1 ; c <= 215665; c++ )
                 for ( int d = 1 ; d <= 3000; d++ )
@@ -51,7 +52,7 @@ void main_pipe() {
             write( STDOUT_FILENO, "Parent: sending \"Another Message\"\n", 34 );
             write(fds[1], msg2, 18 );
 
-            close_pipe(fds[1]);
+            close(fds[1]);
             write( STDOUT_FILENO, "Parent out\n", 23 );
             exit( EXIT_SUCCESS );
         }
