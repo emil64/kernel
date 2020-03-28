@@ -332,7 +332,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
 
             int* fildes;
             fildes = (int* ) (ctx->gpr[0]);
-            fildes = (int *) 0x7007a6b8;
+//            fildes = (int *) 0x7007a6b8;
 
             pipe_t *pipe = (pipe_t *) malloc(sizeof(pipe_t));
 
@@ -372,7 +372,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
                 fdTab[write_fd].pipe = pipe;
 
                 *(fildes) = read_fd;
-//                *(fildes+1) = write_fd;
+                *(fildes+1) = write_fd;
 
                 ctx->gpr[0] = 0;
 
