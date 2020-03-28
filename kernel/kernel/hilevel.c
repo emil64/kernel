@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "bugprone-narrowing-conversions"
 #include "hilevel.h"
 
 
@@ -25,9 +27,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
     PL011_putc( UART0, next_pid, true );
     PL011_putc( UART0, ']',      true );
 
-    executing = next;      // update   executing process to P_{next}
-
-  return;
+    executing = next;
 }
 
 void schedule( ctx_t* ctx ) {
@@ -56,8 +56,6 @@ void schedule( ctx_t* ctx ) {
     prev_p->status = STATUS_READY;
   procTab[ next ].status = STATUS_EXECUTING;
   procTab[ next ].cpu_time += 1;
-
-  return;
 }
 
 extern void     main_console();
@@ -114,7 +112,6 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
 
   dispatch( ctx, NULL, &procTab[ 0 ] );
 
-  return;
 }
 
 void hilevel_handler_irq(ctx_t* ctx) {
@@ -135,7 +132,6 @@ void hilevel_handler_irq(ctx_t* ctx) {
 
   GICC0->EOIR = id;
 
-  return;
 }
 
 void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
@@ -168,7 +164,14 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       }
       else if( fdTab[ fd ].access == WRITE){
 
+          pipe_t *p = fdTab [ fd ].pipe;
 
+
+          
+           //start writing to pipe
+           for( int i = 0; i < n; i++ ) {
+
+           }
       }
       else{
         ctx->gpr[0] = -1;  //file descriptor not ment for writing
@@ -345,7 +348,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
   }
 
-  return;
 }
 
 //invoked at the beging of the scheduler

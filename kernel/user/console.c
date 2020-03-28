@@ -37,6 +37,7 @@ void gets( char* x, int n ) {
 extern void main_P3();
 extern void main_P4();
 extern void main_P5();
+extern void main_pipe();
 
 void* load( char* x ) {
   if     ( 0 == strcmp( x, "P3" ) ) {
@@ -48,10 +49,15 @@ void* load( char* x ) {
   else if( 0 == strcmp( x, "P5" ) ) {
     return &main_P5;
   }
+  else if( 0 == strcmp( x, "pipe" ) ) {
+    return &main_pipe;
+  }
 
   return NULL;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
 /* The behaviour of a console process can be summarised as an infinite
  * loop over three main steps, namely
  *
@@ -124,3 +130,4 @@ void main_console() {
 
   exit( EXIT_SUCCESS );
 }
+#pragma clang diagnostic pop
