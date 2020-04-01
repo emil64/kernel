@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="183555fe-a1ca-4b20-85f7-dc17f71b3526" name="Vagrant (183555fe-a1ca-4b20-85f7-dc17f71b3526)" url="http:///">
+        <fileTransfer host="localhost" port="2222" privateKey="$PROJECT_DIR$/../../.vagrant/machines/default/virtualbox/private_key" accessType="SFTP" keyPair="true">
+          <option name="port" value="2222" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

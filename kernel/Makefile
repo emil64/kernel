@@ -14,6 +14,7 @@
 
  QEMU_PATH        = /usr
  QEMU_GDB         =        127.0.0.1:1234
+ QEMU_GDB_SERVER  =        127.0.0.1:8889
  QEMU_UART        = stdio
 QEMU_UART       += telnet:127.0.0.1:1235,server
 #QEMU_UART       += telnet:127.0.0.1:1236,server
@@ -46,6 +47,9 @@ launch-qemu : ${PROJECT_TARGETS}
 
 launch-gdb  : ${PROJECT_TARGETS}
 	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gdb -ex "file $(filter %.elf, ${PROJECT_TARGETS})" -ex "target remote ${QEMU_GDB}"
+
+launch-gdb-s  : ${PROJECT_TARGETS}
+	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gdb -ex "file $(filter %.elf, ${PROJECT_TARGETS})" -ex "target remote ${QEMU_GDB_SERVER}"
 
 kill-qemu   :
 	@-killall --quiet --user ${USER} qemu-system-arm

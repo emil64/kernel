@@ -218,6 +218,8 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
                 for(int i =0; i< p->size; i++){
                     *(x+i) = p->buffer[i];
                 }
+
+                ctx->gpr[0] = p->size;
                 p->size = 0;
             }
 
@@ -437,8 +439,8 @@ void try_read(int pcb) {
         for(int i =0; i< p->size; i++){
             *(x+i) = p->buffer[i];
         }
+        procTab[pcb].ctx.gpr[0] = p->size;
         p->size = 0;
-        procTab[pcb].ctx.gpr[0] = 0;
         procTab[pcb].status = STATUS_READY;
     }
 
