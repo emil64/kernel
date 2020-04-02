@@ -31,7 +31,7 @@ void main_pipe() {
             write( STDOUT_FILENO, buf, nbytes );
 
             close(fds[0] );
-            write( STDOUT_FILENO, "Child out.\n", 22 );
+            write( STDOUT_FILENO, "Child out.\n", 11 );
             exit( EXIT_SUCCESS );
         }
 
@@ -40,20 +40,22 @@ void main_pipe() {
             const char msg1[] = "\"Hello world from another world\"\n";
             const char msg2[] = "\"Another Message\"\n";
 
-            write( STDOUT_FILENO, "Parent: sending \"Hello world\"\n", 32 );
-            write(fds[1], msg1, 20);
+            write( STDOUT_FILENO, "Parent1: sending \"Hello world\"\n", 32 );
+            write(fds[1], msg1, 30);
 
+
+            //sleep
             for ( int c = 1 ; c <= 215665; c++ )
                 for ( int d = 1 ; d <= 3000; d++ )
                 {
                     asm ( "nop" );
                 }
 
-            write( STDOUT_FILENO, "Parent: sending \"Another Message\"\n", 34 );
+            write( STDOUT_FILENO, "Parent2: sending \"Another Message\"\n", 34 );
             write(fds[1], msg2, 18 );
 
             close(fds[1]);
-            write( STDOUT_FILENO, "Parent out\n", 23 );
+            write( STDOUT_FILENO, "Parent out\n", 11 );
             exit( EXIT_SUCCESS );
         }
     }

@@ -281,6 +281,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
             int signal = ctx->gpr[0];
 
             executing->status = STATUS_TERMINATED;
+            schedule(ctx);
             break;
         }
 
@@ -314,6 +315,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
             }
             ctx->gpr[0] = 0; //success
             //procTab[ 1 ].status = STATUS_TERMINATED;
+            schedule(ctx);
             break;
         }
 
