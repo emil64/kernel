@@ -147,6 +147,225 @@ void hilevel_handler_irq(ctx_t *ctx) {
 
 }
 
+void sys_write(ctx_t *ctx){
+    int fd = (int) (ctx->gpr[0]);
+    char *x = (char *) (ctx->gpr[1]);
+    int n = (int) (ctx->gpr[2]);
+
+    if (fd == 1) { //STDOUT_FILENO
+        for (int i = 0; i < n; i++) {
+            PL011_putc(UART0, *x++, true);
+        }
+        ctx->gpr[0] = n;
+
+    } else if (fdTab[fd].access == WRITE) {
+
+        pipe_t *p = fdTab[fd].pipe;
+
+        if(p->size != 0){
+            executing->status = STATUS_WAITING_WRITE;
+            schedule(ctx);
+            return;
+        }
+
+        //start writing to pipe
+        for (int i = 0; i < n; i++, x++) {
+            p->buffer[(p->size)] = *x;
+            p->size++;
+        }
+        ctx->gpr[0] = n;
+    } else {
+        ctx->gpr[0] = -1;  //file descriptor not meant for writing
+    }
+}
+
+void sys_read(ctx_t *ctx){
+    int fd = (int) (ctx->gpr[0]);
+    char *x = (char *) (ctx->gpr[1]);
+    int n = (int) (ctx->gpr[2]);
+
+    if(fdTab[fd].access == READ){
+        pipe_t *p = fdTab[fd].pipe;
+
+        if(p->size == 0){
+            executing->status = STATUS_WAITING_READ;
+            schedule(ctx);
+            return;
+        }
+
+        //start reading from the pipe
+        for(int i =0; i< p->size; i++){
+            *(x+i) = p->buffer[i];
+        }
+
+        ctx->gpr[0] = p->size;
+        p->size = 0;
+    }
+}
+
+void sys_fork(ctx_t *ctx){
+    n_pid++;
+    PL011_putc(UART0, '\n', true);
+    PL011_putc(UART0, 'F', true);
+    PL011_putc(UART0, 'O', true);
+    PL011_putc(UART0, 'R', true);
+    PL011_putc(UART0, 'K', true);
+    PL011_putc(UART0, ' ', true);
+    PL011_putc(UART0, '0' + n_pid, true);
+    PL011_putc(UART0, '\n', true);
+    int gap = -1;
+    for (int i = 0; i < n_pcb; i++)
+        if (procTab[i].status == STATUS_TERMINATED) {
+            gap = i;
+            break;
+        }
+
+
+    if (gap == -1) {
+        gap = n_pcb;
+        n_pcb++;
+        memset(&procTab[gap], 0, sizeof(pcb_t));
+
+        //allocate stack for the new process
+        procTab[gap].tos = (uint32_t) &tos_general - (n_pcb - 1) * stack_offset;
+    }
+
+    // initialise process
+    procTab[gap].pid = n_pid;
+    procTab[gap].age = 0;
+    procTab[gap].priority = 80;
+    procTab[gap].niceness = 0;
+    procTab[gap].cpu_time = 0.0f;
+    procTab[gap].status = STATUS_READY;
+
+    //replicate state
+    memcpy(&procTab[gap].ctx, ctx, sizeof(ctx_t));
+
+    //copy stack from the parent
+    uint32_t size = executing->tos - (uint32_t) ctx->sp;
+    procTab[gap].ctx.sp = procTab[gap].tos - size;
+    memcpy((uint32_t *) (procTab[gap].ctx.sp), (uint32_t *) ctx->sp, size);
+
+    //set return values
+    ctx->gpr[0] = n_pid;           //parent
+    procTab[gap].ctx.gpr[0] = 0;   //child
+
+}
+
+void sys_exit(ctx_t *ctx){
+    int signal = ctx->gpr[0];
+    executing->status = STATUS_TERMINATED;
+    schedule(ctx);
+}
+
+void sys_exec(ctx_t *ctx){
+    ctx->pc = ctx->gpr[0];
+    ctx->sp = executing->tos;
+}
+
+void sys_kill(ctx_t *ctx){
+    int pid = ctx->gpr[0];
+
+    PL011_putc(UART0, '\n', true);
+    PL011_putc(UART0, 'K', true);
+    PL011_putc(UART0, 'I', true);
+    PL011_putc(UART0, 'L', true);
+    PL011_putc(UART0, 'L', true);
+    PL011_putc(UART0, ' ', true);
+    PL011_putc(UART0, '0' + pid, true);
+    PL011_putc(UART0, '\n', true);
+    //pcb_t *process = NULL;
+
+    int i;
+    for (i = 0; i < n_pcb; i++) {
+        if (pid == procTab[i].pid && procTab[i].status != STATUS_TERMINATED) {
+            procTab[i].status = STATUS_TERMINATED;
+            break;
+        }
+    }
+    ctx->gpr[0] = 0; //success
+    //procTab[ 1 ].status = STATUS_TERMINATED;
+    schedule(ctx);
+}
+
+void sys_nice(ctx_t *ctx){
+    int pid = ctx->gpr[0];
+    int nice = ctx->gpr[1];
+    for (int i = 0; i < n_pcb; i++) {
+        if (pid == procTab[i].pid && procTab[i].status != STATUS_TERMINATED) {
+            procTab[i].niceness = nice;
+            break;
+        }
+    }
+}
+
+void sys_pipe(ctx_t *ctx){
+    int* fildes;
+    fildes = (int* ) (ctx->gpr[0]);
+//            fildes = (int *) 0x7007a6b8;
+
+    pipe_t *pipe = (pipe_t *) malloc(sizeof(pipe_t));
+
+    if (pipe == NULL) {
+        ctx->gpr[0] = -1;
+        return;
+    }
+
+    pipe->size = 0;
+    pipe->readers = 1;
+    pipe->writers = 1;
+
+    int read_fd = -1;
+    int write_fd = -1;
+
+    for (int i = 0; i < 128; i++) {
+        if (fdTab[i].access == FREE) {
+            if (read_fd == -1) {
+                read_fd = i;
+            } else {
+                write_fd = i;
+                break;
+            }
+        }
+    }
+
+    //no fd available
+    if (read_fd == -1 || write_fd == -1) {
+        free(pipe);
+        ctx->gpr[0] = -1;
+    } else {
+
+        fdTab[read_fd].access = READ;
+        fdTab[read_fd].pipe = pipe;
+
+        fdTab[write_fd].access = WRITE;
+        fdTab[write_fd].pipe = pipe;
+
+        *(fildes) = read_fd;
+        *(fildes+1) = write_fd;
+
+        ctx->gpr[0] = 0;
+
+        PL011_putc(UART0, 'K', true);
+    }
+}
+
+void sys_closepipe(ctx_t *ctx){
+    int fd = ctx->gpr[0];
+    pipe_t *p = fdTab[fd].pipe;
+    if(fdTab[fd].access == READ)
+        p->readers--;
+    if(fdTab[fd].access == WRITE)
+        p->writers--;
+
+    if(p->writers == 0 && p->readers == 0)
+        free(p);
+
+    fdTab[fd].access = FREE;
+
+    ctx->gpr[0] = 0;
+}
+
 void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
     /* Based on the identifier (i.e., the immediate operand) extracted from the
      * svc instruction,
@@ -158,250 +377,62 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
 
     switch (id) {
         case 0x00 : { // 0x00 => yield()
-            schedule(ctx);
 
+            schedule(ctx);
             break;
         }
 
         case 0x01 : { // 0x01 => write( fd, x, n )
 
-            int fd = (int) (ctx->gpr[0]);
-            char *x = (char *) (ctx->gpr[1]);
-            int n = (int) (ctx->gpr[2]);
-
-            if (fd == 1) { //STDOUT_FILENO
-                for (int i = 0; i < n; i++) {
-                    PL011_putc(UART0, *x++, true);
-                }
-                ctx->gpr[0] = n;
-
-            } else if (fdTab[fd].access == WRITE) {
-
-                pipe_t *p = fdTab[fd].pipe;
-
-                if(p->size != 0){
-                    executing->status = STATUS_WAITING_WRITE;
-                    schedule(ctx);
-                    break;
-                }
-
-                //start writing to pipe
-                for (int i = 0; i < n; i++, x++) {
-                    p->buffer[(p->size)] = *x;
-                    p->size++;
-                }
-                ctx->gpr[0] = n;
-            } else {
-                ctx->gpr[0] = -1;  //file descriptor not meant for writing
-            }
-
-
+            sys_write(ctx);
             break;
         }
 
         case 0x02 : { //SYS_READ
 
-            int fd = (int) (ctx->gpr[0]);
-            char *x = (char *) (ctx->gpr[1]);
-            int n = (int) (ctx->gpr[2]);
-
-            if(fdTab[fd].access == READ){
-                pipe_t *p = fdTab[fd].pipe;
-
-                if(p->size == 0){
-                    executing->status = STATUS_WAITING_READ;
-                    schedule(ctx);
-                    break;
-                }
-
-                //start reading from the pipe
-                for(int i =0; i< p->size; i++){
-                    *(x+i) = p->buffer[i];
-                }
-
-                ctx->gpr[0] = p->size;
-                p->size = 0;
-            }
-
+            sys_read(ctx);
             break;
         }
 
         case 0x03 : { //SYS_FORK
 
-            n_pid++;
-            PL011_putc(UART0, '\n', true);
-            PL011_putc(UART0, 'F', true);
-            PL011_putc(UART0, 'O', true);
-            PL011_putc(UART0, 'R', true);
-            PL011_putc(UART0, 'K', true);
-            PL011_putc(UART0, ' ', true);
-            PL011_putc(UART0, '0' + n_pid, true);
-            PL011_putc(UART0, '\n', true);
-            int gap = -1;
-            for (int i = 0; i < n_pcb; i++)
-                if (procTab[i].status == STATUS_TERMINATED) {
-                    gap = i;
-                    break;
-                }
-
-
-            if (gap == -1) {
-                gap = n_pcb;
-                n_pcb++;
-                memset(&procTab[gap], 0, sizeof(pcb_t));
-
-                //allocate stack for the new process
-                procTab[gap].tos = (uint32_t) &tos_general - (n_pcb - 1) * stack_offset;
-            }
-
-            // initialise process
-            procTab[gap].pid = n_pid;
-            procTab[gap].age = 0;
-            procTab[gap].priority = 80;
-            procTab[gap].niceness = 0;
-            procTab[gap].cpu_time = 0.0f;
-            procTab[gap].status = STATUS_READY;
-
-            //replicate state
-            memcpy(&procTab[gap].ctx, ctx, sizeof(ctx_t));
-
-            //copy stack from the parent
-            uint32_t size = executing->tos - (uint32_t) ctx->sp;
-            procTab[gap].ctx.sp = procTab[gap].tos - size;
-            memcpy((uint32_t *) (procTab[gap].ctx.sp), (uint32_t *) ctx->sp, size);
-
-            //set return values
-            ctx->gpr[0] = n_pid;           //parent
-            procTab[gap].ctx.gpr[0] = 0;   //child
-
+            sys_fork(ctx);
             break;
         }
 
         case 0x04 : { //SYS_EXIT (signal)
-            int signal = ctx->gpr[0];
 
-            executing->status = STATUS_TERMINATED;
-            schedule(ctx);
+            sys_exit(ctx);
             break;
         }
 
         case 0x05 : { //SYS_EXEC (x)
 
-            ctx->pc = ctx->gpr[0];
-            ctx->sp = executing->tos;
+            sys_exec(ctx);
             break;
         }
 
         case 0x06 : { //SYS_KILL (pid, signal)
 
-            int pid = ctx->gpr[0];
-
-            PL011_putc(UART0, '\n', true);
-            PL011_putc(UART0, 'K', true);
-            PL011_putc(UART0, 'I', true);
-            PL011_putc(UART0, 'L', true);
-            PL011_putc(UART0, 'L', true);
-            PL011_putc(UART0, ' ', true);
-            PL011_putc(UART0, '0' + pid, true);
-            PL011_putc(UART0, '\n', true);
-            //pcb_t *process = NULL;
-
-            int i;
-            for (i = 0; i < n_pcb; i++) {
-                if (pid == procTab[i].pid && procTab[i].status != STATUS_TERMINATED) {
-                    procTab[i].status = STATUS_TERMINATED;
-                    break;
-                }
-            }
-            ctx->gpr[0] = 0; //success
-            //procTab[ 1 ].status = STATUS_TERMINATED;
-            schedule(ctx);
+            sys_kill(ctx);
             break;
         }
 
         case 0x07 : { //SYS_NICE (pid, x)
 
-            int pid = ctx->gpr[0];
-            int nice = ctx->gpr[1];
-            for (int i = 0; i < n_pcb; i++) {
-                if (pid == procTab[i].pid && procTab[i].status != STATUS_TERMINATED) {
-                    procTab[i].niceness = nice;
-                    break;
-                }
-            }
+            sys_nice(ctx);
             break;
         }
 
         case 0x08 : { //SYS_PIPE
 
-            int* fildes;
-            fildes = (int* ) (ctx->gpr[0]);
-//            fildes = (int *) 0x7007a6b8;
-
-            pipe_t *pipe = (pipe_t *) malloc(sizeof(pipe_t));
-
-            if (pipe == NULL) {
-                ctx->gpr[0] = -1;
-                break;
-            }
-
-            pipe->size = 0;
-            pipe->readers = 1;
-            pipe->writers = 1;
-
-            int read_fd = -1;
-            int write_fd = -1;
-
-            for (int i = 0; i < 128; i++) {
-                if (fdTab[i].access == FREE) {
-                    if (read_fd == -1) {
-                        read_fd = i;
-                    } else {
-                        write_fd = i;
-                        break;
-                    }
-                }
-            }
-
-            //no fd available
-            if (read_fd == -1 || write_fd == -1) {
-                free(pipe);
-                ctx->gpr[0] = -1;
-            } else {
-
-                fdTab[read_fd].access = READ;
-                fdTab[read_fd].pipe = pipe;
-
-                fdTab[write_fd].access = WRITE;
-                fdTab[write_fd].pipe = pipe;
-
-                *(fildes) = read_fd;
-                *(fildes+1) = write_fd;
-
-                ctx->gpr[0] = 0;
-
-                PL011_putc(UART0, 'K', true);
-            }
-
+            sys_pipe(ctx);
             break;
 
         }
         case 0x09 : { //SYS_CLOSEPIPE
 
-            int fd = ctx->gpr[0];
-            pipe_t *p = fdTab[fd].pipe;
-            if(fdTab[fd].access == READ)
-                p->readers--;
-            if(fdTab[fd].access == WRITE)
-                p->writers--;
-
-            if(p->writers == 0 && p->readers == 0)
-                free(p);
-
-            fdTab[fd].access = FREE;
-
-            ctx->gpr[0] = 0;
-
+            sys_closepipe(ctx);
             break;
         }
 

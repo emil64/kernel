@@ -38,6 +38,7 @@ extern void main_P3();
 extern void main_P4();
 extern void main_P5();
 extern void main_pipe();
+extern void main_dpp();
 
 void* load( char* x ) {
   if     ( 0 == strcmp( x, "P3" ) ) {
@@ -51,6 +52,9 @@ void* load( char* x ) {
   }
   else if( 0 == strcmp( x, "pipe" ) ) {
     return &main_pipe;
+  }
+  else if( 0 == strcmp( x, "dpp" ) ) {
+      return &main_dpp;
   }
 
   return NULL;
