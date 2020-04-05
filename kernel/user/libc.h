@@ -40,6 +40,7 @@ typedef int pid_t;
 #define SYS_NICE      ( 0x07 )
 #define SYS_PIPE      ( 0x08 )
 #define SYS_CLOSEPIPE ( 0x09 )
+#define SYS_READ_NONBLOCKING (0x0a)
 
 #define SIG_TERM      ( 0x00 )
 #define SIG_QUIT      ( 0x01 )
@@ -80,4 +81,9 @@ extern void nice( pid_t pid, int x );
 extern int pipe( const int *fds);
 //for closing a pipe
 extern void close( int id );
+
+extern void sleep( int t);
+
+extern int read_nb( int fd, void* x, size_t n);
+
 #endif

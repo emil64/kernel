@@ -45,11 +45,7 @@ void main_pipe() {
 
 
             //sleep
-            for ( int c = 1 ; c <= 215665; c++ )
-                for ( int d = 1 ; d <= 3000; d++ )
-                {
-                    asm ( "nop" );
-                }
+            sleep(3000);
 
             write( STDOUT_FILENO, "Parent2: sending \"Another Message\"\n", 34 );
             write(fds[1], msg2, 18 );

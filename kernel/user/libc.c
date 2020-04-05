@@ -45,6 +45,14 @@ void itoa( char* r, int x ) {
   return;
 }
 
+void sleep(int t){
+    for ( int d = 1 ; d <= t; d++ )
+        for ( int c = 1 ; c <= 210000; c++ )
+        {
+            asm ( "nop" );
+        }
+}
+
 void yield() {
   asm volatile( "svc %0     \n" // make system call SYS_YIELD
               :
@@ -161,4 +169,19 @@ void close( int id)  {
               : "r0" );
 
   return;
+}
+
+int read_nb( int fd,       void* x, size_t n ) {
+    int r;
+
+    asm volatile( "mov r0, %2 \n" // assign r0 = fd
+                  "mov r1, %3 \n" // assign r1 =  x
+                  "mov r2, %4 \n" // assign r2 =  n
+                  "svc %1     \n" // make system call SYS_READ
+                  "mov %0, r0 \n" // assign r  = r0
+    : "=r" (r)
+    : "I" (SYS_READ_NONBLOCKING),  "r" (fd), "r" (x), "r" (n)
+    : "r0", "r1", "r2" );
+
+    return r;
 }

@@ -95,7 +95,7 @@ void hilevel_handler_rst(ctx_t *ctx) {
      */
 
     for (int i = 0; i < MAX_PROCS; i++) {
-        procTab[i].status = STATUS_INVALID;
+        procTab[i].status = STATUS_CREATED;
     }
 
     //initialise file descriptor table
@@ -366,6 +366,25 @@ void sys_closepipe(ctx_t *ctx){
     ctx->gpr[0] = 0;
 }
 
+void sys_read_nb(ctx_t *ctx){
+    int fd = (int) (ctx->gpr[0]);
+    char *x = (char *) (ctx->gpr[1]);
+    int n = (int) (ctx->gpr[2]);
+
+    if(fdTab[fd].access == READ){
+        pipe_t *p = fdTab[fd].pipe;
+
+        if(p->size != 0){
+            //start reading from the pipe
+            for(int i =0; i< p->size; i++){
+                *(x+i) = p->buffer[i];
+            }
+        }
+        ctx->gpr[0] = p->size;
+        p->size = 0;
+    }
+}
+
 void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
     /* Based on the identifier (i.e., the immediate operand) extracted from the
      * svc instruction,
@@ -434,6 +453,10 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
 
             sys_closepipe(ctx);
             break;
+        }
+
+        case 0x0a : { //SYS_READ_NON_BLOCKING
+            sys_read_nb(ctx);
         }
 
         default   : { // 0x?? => unknown/unsupported
