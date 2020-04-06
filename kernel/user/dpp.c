@@ -20,8 +20,9 @@ double_channel_t pipes[n_phil];
 
 void take_rightchopstick(int id){
     bool grabbed = false;
-    char msg[100];
+
     while(!grabbed){
+        char msg[100]="";
         write(pipes[id].p_w[1], "request the right chopstick", 27);
         read(pipes[id].w_p[0], msg, 100);
         if(strcmp(msg, "ok") == 0)
@@ -33,8 +34,8 @@ void take_rightchopstick(int id){
 
 void take_leftchopstick(int id){
     bool grabbed = false;
-    char msg[100];
     while(!grabbed){
+        char msg[100]="";
         write(pipes[id].p_w[1], "request the left chopstick", 26);
         read(pipes[id].w_p[0], msg, 100);
         if(strcmp(msg, "ok") == 0)
@@ -108,16 +109,21 @@ void main_dpp(){
     }
 
     while (1){
-        
+
+        bool has_work = false;
         for(int i=0; i<n_phil; i++){
 
             char msg[100]="";
             int len = read_nb(pipes[i].p_w[0], msg, 100);
 //            print_status(i, msg);
-//            write(STDOUT_FILENO, "\n")
+//            write(STDOUT_FILENO, "\n");
             if(len != 0){
+
+                has_work = true;
                 if(strcmp(msg, "request the left chopstick") == 0){
                     if(chopsticks[left(i)] == FREE && chopsticks[right(i)] == FREE){
+//                        print_status(i, msg);
+//                        write(STDOUT_FILENO, "\n", 1);
                         chopsticks[left(i)] = TAKEN;
                         chopsticks[right(i)] = RESERVED;
                         write(pipes[i].w_p[1], "ok", 2);
@@ -125,21 +131,28 @@ void main_dpp(){
                     else
                         write(pipes[i].w_p[1], "nope", 4);
                 }
-                if(strcmp(msg, "request the right chopstick") == 0){
+                else if(strcmp(msg, "request the right chopstick") == 0){
                     if(chopsticks[right(i)] == FREE || chopsticks[right(i)] == RESERVED){
+//                        print_status(i, msg);
+//                        write(STDOUT_FILENO, "\n", 1);
                         chopsticks[right(i)] = TAKEN;
                         write(pipes[i].w_p[1], "ok", 2);
                     }
                     else
                         write(pipes[i].w_p[1], "nope", 4);
                 }
-                if(strcmp(msg, "here are the chopsticks") == 0){
+                else if(strcmp(msg, "here are the chopsticks") == 0){
+//                    print_status(i, msg);
+//                    write(STDOUT_FILENO, "\n", 1);
                     chopsticks[left(i)] = FREE;
                     chopsticks[right(i)] = FREE;
                 }
             }
         }
-        sleep(250);
+        if(!has_work)
+            yield();
+
+
     }
 
 
