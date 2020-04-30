@@ -1,7 +1,3 @@
-//
-// Created by emil on 04/04/2020.
-//
-
 #include "dpp.h"
 
 void print_id(int id){
@@ -151,8 +147,6 @@ void main_dpp(){
         }
         if(!has_work)
             yield();
-
-
     }
 
 

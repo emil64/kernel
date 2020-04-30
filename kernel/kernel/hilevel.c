@@ -3,15 +3,25 @@
 
 #include "hilevel.h"
 
-
 pcb_t procTab[MAX_PROCS];
 pcb_t *executing = NULL;
 int n_pcb, n_pid;
 uint32_t stack_offset = 0x2000;
 fildes_t fdTab[128];
 
+/*
+ * Purpose: non blocking read and write
+ * Implementation: line 500
+ */
+
 void try_read(int pcb);
 void try_write(int pcb);
+
+/*
+ * Purpose: transition form a process to another
+ * Implementation: preserving the context for the previous process, restoring it for the next one and
+ *                 updating the executing address
+ */
 
 void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next) {
     char prev_pid = '?', next_pid = '?';
@@ -35,6 +45,17 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next) {
     executing = next;
 }
 
+/*
+ * Purpose: selecting the next process
+ * Implementation: trying to finish reading or writing to the pipe in order to wake up the processes,
+ *                 calculating the priority of each process, selecting the one with the minimum,
+ *                 updating the age (wait time) for the other processes
+ *                 dispatching the next process
+ *
+ *                 priority = base (static) priority + waiting time + niceness
+ *
+ */
+
 void schedule(ctx_t *ctx) {
 
     for (int i = 0; i < n_pcb; i++){
@@ -50,8 +71,6 @@ void schedule(ctx_t *ctx) {
         int pr = procTab[i].priority + procTab[i].niceness + procTab[i].age;
         if (pr <= min_priority &&
             (procTab[i].status == STATUS_READY || procTab[i].status == STATUS_EXECUTING)) {
-
-            //PL011_putc( UART0, '0'+i,      true );
             next = i;
             min_priority = pr;
         }
@@ -67,24 +86,34 @@ void schedule(ctx_t *ctx) {
     if (prev_p->status == STATUS_EXECUTING)
         prev_p->status = STATUS_READY;
     procTab[next].status = STATUS_EXECUTING;
-    procTab[next].cpu_time += 1;
 }
 
+
+/*
+ * At first, the only process is the console
+ */
 extern void main_console();
 
 extern uint32_t tos_console;
 extern uint32_t tos_general;
 
+
+/*
+ * Purpose: resetting the kernel to the initial state (the only process is the console)
+ * Implementation: enabling timer and irq interrupt,
+ *                 initializing the file desriptor and processes tables
+ *                 initialize the console and run it
+ */
 void hilevel_handler_rst(ctx_t *ctx) {
 
     TIMER0->Timer1Load = 0x00100000; // select period = 2^20 ticks ~= 1 sec
-    TIMER0->Timer1Ctrl = 0x00000002; // select 32-bit   timer
+    TIMER0->Timer1Ctrl = 0x00000002; // select 32-bit timer
     TIMER0->Timer1Ctrl |= 0x00000040; // select periodic timer
-    TIMER0->Timer1Ctrl |= 0x00000020; // enable          timer interrupt
-    TIMER0->Timer1Ctrl |= 0x00000080; // enable          timer
+    TIMER0->Timer1Ctrl |= 0x00000020; // enable timer interrupt
+    TIMER0->Timer1Ctrl |= 0x00000080; // enable timer
 
-    GICC0->PMR = 0x000000F0; // unmask all            interrupts
-    GICD0->ISENABLER1 |= 0x00000010; // enable timer          interrupt
+    GICC0->PMR = 0x000000F0; // unmask all interrupts
+    GICD0->ISENABLER1 |= 0x00000010; // enable timer interrupt
     GICC0->CTLR = 0x00000001; // enable GIC interface
     GICD0->CTLR = 0x00000001; // enable GIC distributor
 
@@ -99,7 +128,6 @@ void hilevel_handler_rst(ctx_t *ctx) {
     }
 
     //initialise file descriptor table
-
     for (int i = 0; i < 128; i++) {
         fdTab[i].access = FREE;
     }
@@ -113,7 +141,6 @@ void hilevel_handler_rst(ctx_t *ctx) {
     procTab[0].age = 0;
     procTab[0].priority = 80;
     procTab[0].niceness = 0;
-    procTab[0].cpu_time = 0.0f;
     procTab[0].status = STATUS_READY;
     procTab[0].tos = (uint32_t) (&tos_console);
     procTab[0].ctx.cpsr = 0x50;
@@ -124,9 +151,12 @@ void hilevel_handler_rst(ctx_t *ctx) {
     n_pid = 1;
 
     dispatch(ctx, NULL, &procTab[0]);
-
 }
 
+/*
+ * Purpose: Handling the Irq interrupt, mainly the pre-emptive scheduling
+ * Implementation: Check if the interrupt source is the timer, and if so, call the scheduler and reset the timer
+ */
 void hilevel_handler_irq(ctx_t *ctx) {
 
     // Step 2: read  the interrupt identifier so we know the source.
@@ -147,6 +177,13 @@ void hilevel_handler_irq(ctx_t *ctx) {
 
 }
 
+/*
+ * Purpose: Writing to a file descriptor
+ * Implentation: write(int fd, char *x, int n)
+ *               if fd = 1: write to UART0
+ *               if fd is a file descriptor for writing, write to it, or go to sleep if it is busy
+ *               else return -1
+ */
 void sys_write(ctx_t *ctx){
     int fd = (int) (ctx->gpr[0]);
     char *x = (char *) (ctx->gpr[1]);
@@ -170,15 +207,20 @@ void sys_write(ctx_t *ctx){
 
         //start writing to pipe
         for (int i = 0; i < n; i++, x++) {
-            p->buffer[(p->size)] = *x;
-            p->size++;
+            p->buffer[i] = *x;
         }
+        p->size = n;
         ctx->gpr[0] = n;
     } else {
         ctx->gpr[0] = -1;  //file descriptor not meant for writing
     }
 }
 
+/*
+ * Purpose: Reading from a file descriptor
+ * Implentation: read(int fd, char *x, int n)
+ *               if fd is a file descriptor for reading, read from it into x, or go to sleep if it hasn't anything in it
+ */
 void sys_read(ctx_t *ctx){
     int fd = (int) (ctx->gpr[0]);
     char *x = (char *) (ctx->gpr[1]);
@@ -203,6 +245,13 @@ void sys_read(ctx_t *ctx){
     }
 }
 
+/*
+ * Purpose: Forking (clonig) a process
+ * Implementation: fork()
+ *                 Find an empty spot on the process table, or insert at the end if it is full
+ *                 initialise the new process and copy the state and the stack of the parent process
+ *                 return 0 to child and the new pid to the parent
+ */
 void sys_fork(ctx_t *ctx){
     n_pid++;
     PL011_putc(UART0, '\n', true);
@@ -212,7 +261,6 @@ void sys_fork(ctx_t *ctx){
     PL011_putc(UART0, 'K', true);
     PL011_putc(UART0, ' ', true);
     PL011_putc(UART0, '0' + n_pid, true);
-    PL011_putc(UART0, '\n', true);
     int gap = -1;
     for (int i = 0; i < n_pcb; i++)
         if (procTab[i].status == STATUS_TERMINATED) {
@@ -235,7 +283,6 @@ void sys_fork(ctx_t *ctx){
     procTab[gap].age = 0;
     procTab[gap].priority = 80;
     procTab[gap].niceness = 0;
-    procTab[gap].cpu_time = 0.0f;
     procTab[gap].status = STATUS_READY;
 
     //replicate state
@@ -252,17 +299,34 @@ void sys_fork(ctx_t *ctx){
 
 }
 
+/*
+ * Purpose: Exiting from a process when it's done (or something happened)
+ * Implementation: exit(int signal)
+ *                 mark the process as terminated and call the scheduler to start the next one
+ */
 void sys_exit(ctx_t *ctx){
     int signal = ctx->gpr[0];
     executing->status = STATUS_TERMINATED;
     schedule(ctx);
 }
 
+/*
+ * Purpose: Executing a specific address
+ * Implementation: exec(void* addr)
+ *                 update the execution context program counter to the address and clear the stack by setting the stack
+ *                        pointer the top of the stack
+ */
 void sys_exec(ctx_t *ctx){
     ctx->pc = ctx->gpr[0];
     ctx->sp = executing->tos;
 }
 
+/*
+ * Purpose: kill a specific process
+ * Implementation: kill(int pid)
+ *                 Finds the process with that pid, marks it as terminated, and calls the scheduler to start
+ *                         the next process
+ */
 void sys_kill(ctx_t *ctx){
     int pid = ctx->gpr[0];
 
@@ -273,8 +337,6 @@ void sys_kill(ctx_t *ctx){
     PL011_putc(UART0, 'L', true);
     PL011_putc(UART0, ' ', true);
     PL011_putc(UART0, '0' + pid, true);
-    PL011_putc(UART0, '\n', true);
-    //pcb_t *process = NULL;
 
     int i;
     for (i = 0; i < n_pcb; i++) {
@@ -284,10 +346,14 @@ void sys_kill(ctx_t *ctx){
         }
     }
     ctx->gpr[0] = 0; //success
-    //procTab[ 1 ].status = STATUS_TERMINATED;
     schedule(ctx);
 }
 
+/*
+ * Purpose: change the niceness of a process
+ * Implementation: nice(int pid, int nice)
+ *                 finds the process with that pid and update its niceness with the one for the argumet
+ */
 void sys_nice(ctx_t *ctx){
     int pid = ctx->gpr[0];
     int nice = ctx->gpr[1];
@@ -299,10 +365,17 @@ void sys_nice(ctx_t *ctx){
     }
 }
 
+/*
+ * Purpose: create a pipe
+ * Implementation: pipe(int[2] fildes)
+ *                 allocate space for the pipe and find 2 free file descriptors for reading and writing and pointing
+ *                     them to the pipe
+ *                 because fildes is transmitted by reference, we can return the position of file descriptors this way
+ *
+ */
 void sys_pipe(ctx_t *ctx){
     int* fildes;
     fildes = (int* ) (ctx->gpr[0]);
-//            fildes = (int *) 0x7007a6b8;
 
     pipe_t *pipe = (pipe_t *) malloc(sizeof(pipe_t));
 
@@ -345,11 +418,15 @@ void sys_pipe(ctx_t *ctx){
         *(fildes+1) = write_fd;
 
         ctx->gpr[0] = 0;
-
-        PL011_putc(UART0, 'K', true);
     }
 }
 
+/*
+ * Purpose: closing a pipe
+ * Implementation: close(int fd)
+ *                 decreases the readers or writers depending on the type of the descriptor
+ *                 if there are no more readers and writers, than we cand close the pipe and free the memory
+ */
 void sys_closepipe(ctx_t *ctx){
     int fd = ctx->gpr[0];
     pipe_t *p = fdTab[fd].pipe;
@@ -366,6 +443,12 @@ void sys_closepipe(ctx_t *ctx){
     ctx->gpr[0] = 0;
 }
 
+/*
+ * Purpose: Non blocking reading from a file descriptor
+ * Implentation: read(int fd, char *x, int n)
+ *               if fd is a file descriptor for reading, read from it into x
+ *               if there's nothing in the pipe return 0, instead of going to sleep
+ */
 void sys_read_nb(ctx_t *ctx){
     int fd = (int) (ctx->gpr[0]);
     char *x = (char *) (ctx->gpr[1]);
@@ -385,6 +468,9 @@ void sys_read_nb(ctx_t *ctx){
     }
 }
 
+/*
+ * Purpose: Handleing system calls
+ */
 void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
     /* Based on the identifier (i.e., the immediate operand) extracted from the
      * svc instruction,
@@ -467,6 +553,13 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id) {
 }
 
 //invoked at the beging of the scheduler
+
+
+/*
+ * Purpose: trying to write to a pipe
+ * Implementation: because the state was preserved, the arguments of the system write are the same
+ *                 if the pipe is free, then write to it, else go back to sleep
+ */
 void try_write(int pcb) {
     int fd = (int) (procTab[pcb].ctx.gpr[0]);
     char *x = (char *) (procTab[pcb].ctx.gpr[1]);
@@ -484,6 +577,11 @@ void try_write(int pcb) {
     }
 }
 
+/*
+ * Purpose: trying to read from a pipe
+ * Implementation: because the state was preserved, the arguments of the system write are the same
+ *                 if the pipe has something in it, then read from it, else go back to sleep
+ */
 void try_read(int pcb) {
     int fd = (int) (procTab[pcb].ctx.gpr[0]);
     char *x = (char *) (procTab[pcb].ctx.gpr[1]);

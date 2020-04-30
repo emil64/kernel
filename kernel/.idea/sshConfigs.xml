@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig host="localhost" id="97a64106-bbbd-435f-a985-a3f1b9602c9e" keyPath="$PROJECT_DIR$/../../.vagrant/machines/default/virtualbox/private_key" port="2222" customName="Vagrant (183555fe-a1ca-4b20-85f7-dc17f71b3526)" nameFormat="CUSTOM" username="vagrant" />
+      <sshConfig host="localhost" id="3a915b58-16a8-4eef-a4ee-80016d4a01bc" keyPath="$PROJECT_DIR$/../../.vagrant/machines/default/virtualbox/private_key" port="2222" customName="Vagrant (183555fe-a1ca-4b20-85f7-dc17f71b3526)" nameFormat="CUSTOM" username="vagrant" />
+    </configs>
+  </component>
+</project>
